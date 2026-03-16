@@ -6,36 +6,35 @@ class BlockWorldHeuristic(BlockWorld):
         BlockWorld.__init__(self, num_blocks, state)
 
     def heuristic(self, goal):
-
         self_state = self.get_state()
         goal_state = goal.get_state()
         
-        
         goal_below = {}
-        goal_above = {}
-        h = 0
-
         for stack in goal_state:
             for i, block in enumerate(stack):
                 goal_below[block] = stack[i-1] if i > 0 else None
-                goal_above[block] = stack[i+1] if i < len(stack) - 1 else None
 
-
+        current_below = {}
         for stack in self_state:
             for i, block in enumerate(stack):
+                current_below[block] = stack[i-1] if i > 0 else None
 
-                below = stack[i-1] if i > 0 else None
-                above = stack[i+1] if i < len(stack) - 1 else None
+        def is_correct(block):
+            support = current_below.get(block)
+            if goal_below[block] == support:
+                if support is None:
+                    return True
+                return is_correct(support)
+            else:
+                return False
 
-                if goal_below[block] != below:
-                    blocks_above = len(stack) - i - 1
-                    h += 1 + i * 2
-                    
-                if goal_above[block] != above:
-                    blocks_above = len(stack) - i - 1
-                    h += 1 + blocks_above * 2
+        h = 0
+        for stack in self_state:
+            for block in stack:
+                if not is_correct(block):
+                    h += 1
 
-        return h
+        return float(h)
 
 class AStar():
     def search(self, start, goal):
