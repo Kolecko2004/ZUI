@@ -8,96 +8,105 @@ class BlockWorldHeuristic(BlockWorld):
     def heuristic(self, goal):
         self_state = self.get_state()
         goal_state = goal.get_state()
-        
-        goal_below = {}
+
+        goal_support = {}
         for stack in goal_state:
-            for i, block in enumerate(stack):
-                goal_below[block] = stack[i-1] if i > 0 else None
+            for i in range(len(stack)):
+                block = stack[i]
+                under = stack[i + 1] if i + 1 < len(stack) else None
+                goal_support[block] = under
 
-        current_below = {}
+        misplaced = 0
+        
         for stack in self_state:
-            for i, block in enumerate(stack):
-                current_below[block] = stack[i-1] if i > 0 else None
+            stack_correct = True
+            for i in range(len(stack) - 1, -1, -1):
+                block = stack[i]
+                under = stack[i + 1] if i + 1 < len(stack) else None
 
-        def is_correct(block):
-            support = current_below.get(block)
-            if goal_below[block] == support:
-                if support is None:
-                    return True
-                return is_correct(support)
-            else:
-                return False
+                if stack_correct:
+                    if goal_support.get(block) == under:
+                        pass
+                    else:
+                        stack_correct = False
+                        misplaced += 1
+                else:
+                    misplaced += 1
 
-        h = 0
-        for stack in self_state:
-            for block in stack:
-                if not is_correct(block):
-                    h += 1
-
-        return float(h)
-
+        return misplaced
+        
 class AStar():
     def search(self, start, goal):
-
+        counter = 0
         queue = PriorityQueue()
 
         start_h = start.heuristic(goal)
+        queue.put((start_h, counter, start, []))
 
-        queue.put((start_h, 0, id(start), start, []))
+        def get_state_key(state):
+            return tuple(sorted(tuple(stack) for stack in state if stack))
 
-        visited = {start.get_state(): 0}
+        best_g = {get_state_key(start.get_state()): 0}
+        goal_key = get_state_key(goal.get_state())
 
         while not queue.empty():
 
-            f, g, _, current, path = queue.get()
+            f, _, current, path = queue.get()
+            current_state_key = get_state_key(current.get_state())
+            g = len(path)
 
-            if current == goal:
+            if best_g.get(current_state_key, float('inf')) < g:
+                continue
+
+            if current_state_key == goal_key:
                 return path
 
             for action, neighbor in current.get_neighbors():
-
                 new_g = g + 1
-                state = neighbor.get_state()
+                n_state_key = get_state_key(neighbor.get_state())
 
-                if state not in visited or new_g < visited[state]:
-
-                    visited[state] = new_g
-
-                    h = neighbor.heuristic(goal)
-                    f = new_g + h
-
-                    queue.put((f, new_g, id(neighbor), neighbor, path + [action]))
+                if new_g < best_g.get(n_state_key, float('inf')):
+                    best_g[n_state_key] = new_g
+                    new_h = neighbor.heuristic(goal)
+                    new_f = new_g + new_h
+                    counter += 1
+                    queue.put((new_f, counter, neighbor, path + [action]))
 
         return None
+    
+def format_state(state):
+    return [[int(b) for b in stack] for stack in state]
+
+def format_action(action):
+    return (int(action[0]), int(action[1]))
 
 if __name__ == '__main__':
-	# Here you can test your algorithm. You can try different N values, e.g. 6, 7.
-	N = 5
+    N = 6
 
-	start = BlockWorldHeuristic(N)
-	goal = BlockWorldHeuristic(N)
+    start = BlockWorldHeuristic(N)
+    goal = BlockWorldHeuristic(N)
 
-	print("Searching for a path:")
-	print(f"{start} -> {goal}")
-	print()
+    print("Searching for a path:")
+    print(f"{format_state(start.get_state())} -> {format_state(goal.get_state())}")
+    print()
 
-	astar = AStar()
-	path = astar.search(start, goal)
+    astar = AStar()
+    path = astar.search(start, goal)
 
-	if path is not None:
-		print("Found a path:")
-		print(path)
+    if path is not None:
+        print("Found a path:")
+        print([format_action(a) for a in path])
 
-		print("\nHere's how it goes:")
+        print("\nHere's how it goes:")
 
-		s = start.clone()
-		print([[int(b) for b in stack] for stack in s.get_state()])
+        s = start.clone()
+        print(format_state(s.get_state()))
 
-		for a in path:
-			s.apply(a)
-			print([[int(b) for b in stack] for stack in s.get_state()])
+        for a in path:
+            s.apply(a)
+            print(format_state(s.get_state()))
 
-	else:
-		print("No path exists.")
+    else:
+        print("No path exists.")
 
-	print("Total expanded nodes:", BlockWorld.expanded)
+    print("Total expanded nodes:", BlockWorld.expanded)
